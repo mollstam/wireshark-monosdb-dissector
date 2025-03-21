@@ -11,9 +11,10 @@ local header_error_code = ProtoField.int16("monosdb.error_code", "error code", b
 
 local field_breakpoint_event = ProtoField.bool("monosdb.breakpoint_event", "breakpoint event")
 local field_get_types_name = ProtoField.string("monosdb.get_types_name", "get types")
+local field_suspend_policy = ProtoField.string("monosdb.suspend_policy", "suspend policy")
 
 monosdb_protocol = Proto("MonoSDB", "Mono Soft Debugger Protocol")
-monosdb_protocol.fields = { header_length, header_id, header_flags, header_command_set, header_command, header_error_code, field_breakpoint_event, field_get_types_name }
+monosdb_protocol.fields = { header_length, header_id, header_flags, header_command_set, header_command, header_error_code, field_breakpoint_event, field_get_types_name, field_suspend_policy }
 
 local proto_version_major = -1
 local proto_version_minor = -1
@@ -143,6 +144,16 @@ local function get_mod_kind_str(value)
     return mod_kind_str
 end
 
+local function get_suspend_policy_name(value)
+    local suspend_policy_name = "Unknown"
+
+    if value == 0 then suspend_policy_name = "SUSPEND_POLICY_NONE"
+    elseif value == 1 then suspend_policy_name = "SUSPEND_POLICY_EVENT_THREAD"
+    elseif value == 2 then suspend_policy_name = "SUSPEND_POLICY_ALL" end
+
+    return suspend_policy_name
+end
+
 local function dissect_vm_set_protocol_version(subtree, buffer, offset)
     local major = buffer(offset, 4):uint()
     local minor = buffer(offset + 4, 4):uint()
@@ -162,7 +173,9 @@ local function dissect_vm_get_types(subtree, buffer, offset)
 end
 
 local function dissect_event_composite(subtree, buffer, offset)
-    subtree:add(buffer(offset, 1), "Suspend policy"):append_text(" (" .. buffer(offset, 1):uint() .. ")")
+    local suspend_policy = buffer(offset, 1):uint()
+    local suspend_policy_name = get_suspend_policy_name(suspend_policy)
+    subtree:add(field_suspend_policy, buffer(offset, 1), suspend_policy_name):append_text(" (" .. suspend_policy .. ")")
     local num_events = buffer(offset + 1, 4):uint()
     subtree:add(buffer(offset + 1, 4), num_events .. " Event(s)")
     local event_offset = offset + 5
